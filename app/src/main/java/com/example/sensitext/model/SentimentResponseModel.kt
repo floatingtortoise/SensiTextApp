@@ -5,7 +5,7 @@ class SentimentResponseModel (
     val confidence: String,
     val irony: String,
     val model: String,
-    val score_tag: String,
+    var score_tag: String,
     val sentence_list: List<SentenceModel>,
     val sentimented_concept_list: List<SentimentedElementModel>,
     val sentimented_entity_list: List<SentimentedElementModel>,

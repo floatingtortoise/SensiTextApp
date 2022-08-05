@@ -1,22 +1,18 @@
 package com.example.sensitext
 
-import java.io.IOException
-import okhttp3.OkHttpClient
-import okhttp3.Request
-
 import android.os.Bundle
-import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.navigation.fragment.findNavController
-import com.example.sensitext.databinding.FragmentFirstBinding
-import okhttp3.Response
-
-// TODO: Rename parameter arguments, choose names that match
-// the fragment initialization parameters, e.g. ARG_ITEM_NUMBER
-private const val ARG_PARAM1 = "param1"
-private const val ARG_PARAM2 = "param2"
+import android.widget.Button
+import android.widget.EditText
+import android.widget.TextView
+import androidx.fragment.app.Fragment
+import com.example.sensitext.databinding.FragmentMainBinding
+import com.example.sensitext.model.SentimentResponseModel
+import com.google.gson.Gson
+import okhttp3.*
+import java.io.IOException
 
 /**
  * A simple [Fragment] subclass.
@@ -26,20 +22,15 @@ private const val ARG_PARAM2 = "param2"
 class MainFragment : Fragment() {
 
 
-    private var _binding: ResultProfileBinding? = null
+    private var _binding: FragmentMainBinding? = null
     // This property is only valid between onCreateView and
 // onDestroyView.
     private val binding get() = _binding!!
+    private var outputText: TextView? = null
+    private var inputText: EditText? = null
+    private var button: Button? = null
+    private val gson = Gson()
 
-    override fun onCreateView(
-        inflater: LayoutInflater,
-        container: ViewGroup?,
-        savedInstanceState: Bundle?
-    ): View? {
-        _binding = ResultProfileBinding.inflate(inflater, container, false)
-        val view = binding.root
-        return view
-    }
 
     override fun onDestroyView() {
         super.onDestroyView()
@@ -48,9 +39,6 @@ class MainFragment : Fragment() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        run("https://api.meaningcloud.com/sentiment-2.1?key=126bd3128ae0a988d2cc08000990f4d2&txt="+
-                "The House of Representatives shall be composed of Members chosen every second Year by the People of the several States")
     }
 
     private val client = OkHttpClient()
@@ -58,22 +46,57 @@ class MainFragment : Fragment() {
     private fun run(url: String) {
         val request = Request.Builder()
             .url(url)
+            .post(FormBody.Builder().build())
             .build()
 
-        client.newCall(request).execute().use { response: Response ->
-            if (!response.isSuccessful) throw IOException("Unexpected code $response")
-            println(response.body?.string())
-        }
+        client.newCall(request).enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) {
+                TODO("Not yet implemented")
+            }
+
+            override fun onResponse(call: Call, response: Response) {
+                val resultString = response.body?.string()
+                val sentimentResponseModel: SentimentResponseModel = gson.fromJson(resultString, SentimentResponseModel::class.java)
+                val score = sentimentResponseModel.score_tag
+                val positivity =
+                  if (score =="P+") { "strong positive"}
+                  else if (score == "P") {"positive"}
+                  else if (score =="NEU") { "neutral"}
+                  else if (score =="N") {"negative"}
+                  else if (score =="N+") {"strongly negative"}
+                  else {"without polarity"}
+
+
+                activity?.runOnUiThread {
+                    outputText?.text = """
+    This text is ${sentimentResponseModel.subjectivity.toLowerCase()} and ${sentimentResponseModel.irony.toLowerCase()}.
+    This text contains ${sentimentResponseModel.agreement.toLowerCase()}.
+    The tone is ${positivity}.
+    The confidence score (out of 100) is: ${sentimentResponseModel.confidence}."""
+                }
+            }
+        })
     }
 
     override fun onCreateView(
-        inflater: LayoutInflater, container: ViewGroup?,
+        inflater: LayoutInflater,
+        container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View? {
         // Inflate the layout for this fragment
-        return inflater.inflate(R.layout.fragment_main, container, false)
+        val view = inflater.inflate(R.layout.fragment_main, container, false)
+        outputText = view.findViewById(R.id.output)
+        inputText = view.findViewById(R.id.input)
+        button = view.findViewById(R.id.button)
+        return view
     }
 
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        button?.setOnClickListener {
+            run("https://api.meaningcloud.com/sentiment-2.1?key=126bd3128ae0a988d2cc08000990f4d2&txt="+
+                inputText?.text.toString())}
+    }
 
     companion object {
         /**
@@ -89,8 +112,6 @@ class MainFragment : Fragment() {
         fun newInstance(param1: String, param2: String) =
             MainFragment().apply {
                 arguments = Bundle().apply {
-                    putString(ARG_PARAM1, param1)
-                    putString(ARG_PARAM2, param2)
                 }
             }
     }
